@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from supabase import create_client
 from pydantic import BaseModel
@@ -69,6 +69,20 @@ async def login(data: LoginRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=401, detail={"error": "Invalid login credentials"})
+
+# GET /public/info (NO AUTH REQUIRED)
+@app.get("/public/info")
+async def public_info():
+    return {"message": "Welcome stranger! This info is public."}
+
+# GET /protected/profile (TOKEN REQUIRED BUT NOT VERIFIED YET)
+@app.get("/protected/profile")
+async def protected_profile(authorization: str = Header(None)):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail={"error": "Access token required"})
+    
+    token = authorization.split(" ")[1]
+    return {"message": "Token received (not yet verified)"}
 
 if __name__ == "__main__":
     import uvicorn
