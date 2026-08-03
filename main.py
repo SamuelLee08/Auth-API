@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Header
+from fastapi import FastAPI, HTTPException, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from supabase import create_client
 from pydantic import BaseModel
@@ -36,6 +36,20 @@ class LoginRequest(BaseModel):
     email: str
     password: str
 
+# REUSABLE DEPENDENCY (FastAPI middleware for auth)
+async def verify_token(authorization: str = Header(None)):
+    """Verify JWT token and return user. Use with Depends()."""
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail={"error": "Access token required"})
+    
+    token = authorization.split(" ")[1]
+    
+    try:
+        user = supabase.auth.get_user(token)
+        return user.user
+    except Exception as e:
+        raise HTTPException(status_code=401, detail={"error": "Invalid or expired token"})
+
 # POST /auth/signup
 @app.post("/auth/signup", status_code=201)
 async def signup(data: SignUpRequest):
@@ -70,29 +84,37 @@ async def login(data: LoginRequest):
     except Exception as e:
         raise HTTPException(status_code=401, detail={"error": "Invalid login credentials"})
 
+# POST /auth/logout (PROTECTED)
+@app.post("/auth/logout", status_code=204)
+async def logout(user = Depends(verify_token)):
+    try:
+        supabase.auth.sign_out()
+        return None  # 204 No Content
+    except Exception as e:
+        raise HTTPException(status_code=400, detail={"error": str(e)})
+
 # GET /public/info
 @app.get("/public/info")
 async def public_info():
     return {"message": "Welcome stranger! This info is public."}
 
-# GET /protected/profile (NOW WITH TOKEN VERIFICATION)
+# GET /protected/profile (USES DEPENDENCY)
 @app.get("/protected/profile")
-async def protected_profile(authorization: str = Header(None)):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail={"error": "Access token required"})
-    
-    token = authorization.split(" ")[1]
-    
-    # VERIFY TOKEN WITH SUPABASE
-    try:
-        user = supabase.auth.get_user(token)
-        return {
-            "id": user.user.id,
-            "email": user.user.email,
-            "created_at": user.user.created_at
-        }
-    except Exception as e:
-        raise HTTPException(status_code=401, detail={"error": "Invalid or expired token"})
+async def protected_profile(user = Depends(verify_token)):
+    return {
+        "id": user.id,
+        "email": user.email,
+        "created_at": user.created_at
+    }
+
+# GET /protected/dashboard (SAME GUARD, NO NEW AUTH CODE!)
+@app.get("/protected/dashboard")
+async def protected_dashboard(user = Depends(verify_token)):
+    return {
+        "dashboard": "You are authenticated!",
+        "user_id": user.id,
+        "email": user.email
+    }
 
 if __name__ == "__main__":
     import uvicorn
