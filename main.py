@@ -70,19 +70,29 @@ async def login(data: LoginRequest):
     except Exception as e:
         raise HTTPException(status_code=401, detail={"error": "Invalid login credentials"})
 
-# GET /public/info (NO AUTH REQUIRED)
+# GET /public/info
 @app.get("/public/info")
 async def public_info():
     return {"message": "Welcome stranger! This info is public."}
 
-# GET /protected/profile (TOKEN REQUIRED BUT NOT VERIFIED YET)
+# GET /protected/profile (NOW WITH TOKEN VERIFICATION)
 @app.get("/protected/profile")
 async def protected_profile(authorization: str = Header(None)):
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail={"error": "Access token required"})
     
     token = authorization.split(" ")[1]
-    return {"message": "Token received (not yet verified)"}
+    
+    # VERIFY TOKEN WITH SUPABASE
+    try:
+        user = supabase.auth.get_user(token)
+        return {
+            "id": user.user.id,
+            "email": user.user.email,
+            "created_at": user.user.created_at
+        }
+    except Exception as e:
+        raise HTTPException(status_code=401, detail={"error": "Invalid or expired token"})
 
 if __name__ == "__main__":
     import uvicorn
