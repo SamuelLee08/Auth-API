@@ -29,6 +29,20 @@ Server runs at http://localhost:8000
 - GET /protected/profile - Private profile
 - GET /protected/dashboard - Dashboard
 
+  cat >> README.md << 'EOF'
+
+## Swagger UI Example
+
+Interact with your API directly in the browser. Lock icons 🔒 indicate protected routes.
+
+![Swagger UI with Bearer Token Authorization](screenshots/swagger-example.png)
+
+**How to use:**
+1. Click **Authorize** button (top right)
+2. Paste your JWT access token from `/auth/login`
+3. Click **Try it out** on any endpoint
+4. Swagger automatically includes the Bearer token in requests
+
 ## Security
 
 - Zero-knowledge password handling (Supabase)
