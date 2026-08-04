@@ -35,8 +35,7 @@ Server runs at http://localhost:8000
 
 Interact with your API directly in the browser. Lock icons 🔒 indicate protected routes.
 
-(swagger-example.png)
-
+![Swagger UI with Bearer Token Authorization](screenshots/swagger-example.png)
 **How to use:**
 1. Click **Authorize** button (top right)
 2. Paste your JWT access token from `/auth/login`
