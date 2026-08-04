@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.utils import get_openapi
 from supabase import create_client
 from pydantic import BaseModel
 import os
@@ -36,7 +37,7 @@ class LoginRequest(BaseModel):
     email: str
     password: str
 
-# REUSABLE DEPENDENCY (FastAPI middleware for auth)
+# REUSABLE DEPENDENCY
 async def verify_token(authorization: str = Header(None)):
     """Verify JWT token and return user. Use with Depends()."""
     if not authorization or not authorization.startswith("Bearer "):
@@ -89,7 +90,7 @@ async def login(data: LoginRequest):
 async def logout(user = Depends(verify_token)):
     try:
         supabase.auth.sign_out()
-        return None  # 204 No Content
+        return None
     except Exception as e:
         raise HTTPException(status_code=400, detail={"error": str(e)})
 
@@ -98,7 +99,7 @@ async def logout(user = Depends(verify_token)):
 async def public_info():
     return {"message": "Welcome stranger! This info is public."}
 
-# GET /protected/profile (USES DEPENDENCY)
+# GET /protected/profile (PROTECTED)
 @app.get("/protected/profile")
 async def protected_profile(user = Depends(verify_token)):
     return {
@@ -107,7 +108,7 @@ async def protected_profile(user = Depends(verify_token)):
         "created_at": user.created_at
     }
 
-# GET /protected/dashboard (SAME GUARD, NO NEW AUTH CODE!)
+# GET /protected/dashboard (PROTECTED)
 @app.get("/protected/dashboard")
 async def protected_dashboard(user = Depends(verify_token)):
     return {
@@ -115,6 +116,40 @@ async def protected_dashboard(user = Depends(verify_token)):
         "user_id": user.id,
         "email": user.email
     }
+
+# Configure Swagger UI with Bearer Auth
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    
+    openapi_schema = get_openapi(
+        title="FlyRank Auth API",
+        version="1.0.0",
+        description="Secure authentication with Supabase",
+        routes=app.routes,
+    )
+    
+    # Add Bearer token security scheme
+    openapi_schema["components"]["securitySchemes"] = {
+        "Bearer": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+        }
+    }
+    
+    # Mark protected routes with lock icon
+    protected_paths = ["/protected/", "/auth/logout"]
+    for path in openapi_schema["paths"]:
+        for protected in protected_paths:
+            if path.startswith(protected):
+                for method in openapi_schema["paths"][path]:
+                    openapi_schema["paths"][path][method]["security"] = [{"Bearer": []}]
+    
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi
 
 if __name__ == "__main__":
     import uvicorn
